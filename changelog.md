@@ -1,3 +1,11 @@
+TBD
+===
+
+Features:
+---------
+
+* Add unix like redirect output (Thanks: [Dick Marinus]).
+
 1.10.0:
 =======
 

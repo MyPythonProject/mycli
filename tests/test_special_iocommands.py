@@ -71,8 +71,51 @@ def test_tee_command_error():
             os.chmod(f.name, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
             mycli.packages.special.execute(None, 'tee {}'.format(f.name))
 
+
 def test_favorite_query():
     with utils.db_connection().cursor() as cur:
         query = u'select "✔"'
         mycli.packages.special.execute(cur, u'\\fs check {0}'.format(query))
-        assert next(mycli.packages.special.execute(cur, u'\\f check'))[0] == "> " + query
+        assert next(mycli.packages.special.execute(
+            cur, u'\\f check'))[0] == "> " + query
+
+
+def test_get_set_redirected_output():
+    mycli.packages.special.set_redirected_output()
+    assert not mycli.packages.special.get_redirected_output()["enabled"]
+
+
+def test_redirectmatch():
+    for sql, result in (
+        (r"select 1",           {"sql": r"select 1",
+                                 "enabled": False, "filename": None, "append": False}),
+        (r"select 1 \> on",     {"sql": r"select 1",
+                                 "enabled": True,  "filename": "on", "append": False}),
+        (r'select 1 \> "on"',   {"sql": r"select 1",
+                                 "enabled": True,  "filename": "on", "append": False}),
+        (r"select 1 \>> 'on'",  {"sql": r"select 1",
+                                 "enabled": True,  "filename": "on", "append": True}),
+        (r"select \"\>\"",      {"sql": r"select \"\>\"",
+                                 "enabled": False, "filename": None, "append": False}),
+        (r"select '\>'",        {"sql": r"select '\>'",
+                                 "enabled": False, "filename": None, "append": False}),
+        (r"select",             {"sql": r"select",
+                                 "enabled": False, "filename": None, "append": False}),
+        (r"select\>",           {"sql": r"select\>",
+                                 "enabled": False, "filename": None, "append": False}),
+        (r"select\> ",          {"sql": r"select",
+                                 "enabled": True,  "filename": "",   "append": False}),
+        (r"select\>on",         {"sql": r"select",
+                                 "enabled": True,  "filename": "on", "append": False}),
+        (r"select 1 \> '\'o'",  {"sql": r"select 1",
+                                 "enabled": True,  "filename": "'o", "append": False}),
+        (r"select 1 where 2>1", {"sql": r"select 1 where 2>1",
+                                 "enabled": False, "filename": None, "append": False}),
+        (r"''",                 {
+         "sql": "''",             "enabled": False, "filename": None, "append": False}),
+    ):
+        rsql, r = mycli.packages.special.redirectmatch(sql)
+        assert rsql == result["sql"]
+        assert r["enabled"] == result["enabled"]
+        assert r["filename"] == result["filename"]
+        assert r["append"] == result["append"]
